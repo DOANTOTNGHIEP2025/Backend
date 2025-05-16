@@ -26,13 +26,13 @@ const Doctor_Schema = new Schema({
     verified:{
         type: Boolean,
         default: false
-    },
-    active_hours: [{
+    },    active_hours: [{
         day: String, // days of week
         start_time: String, // hours:minutes
         end_time: String, // hours:minutes
         hour_type: String, // working or appointment
-        appointment_limit: Number // limit the number of appointments in the time frame
+        appointment_limit: Number, // limit the number of appointments in the time frame
+        date: String, // specific date in YYYY-MM-DD format
     }],
     bio: {
         type: String,
@@ -110,14 +110,21 @@ Doctor_Schema.statics.Is_Time_Overlap = async function(new_time, account_Id, exc
 
     for(let existing_Time of existing_Times){
 
+        // Skip if different day or type or date
         if (existing_Time.day !== new_time.day || existing_Time.hour_type !== new_time.hour_type) {
-            continue // skip if different day or type
+            continue
+        }
+        
+        // If dates are provided, check if they are different
+        if (existing_Time.date && new_time.date && existing_Time.date !== new_time.date) {
+            continue // skip if different specific dates
         }
 
         if(excluded_time.day === existing_Time.day 
            && excluded_time.start_time === existing_Time.start_time 
            && excluded_time.end_time === existing_Time.end_time
            && excluded_time.hour_type === existing_Time.hour_type
+           && ((!excluded_time.date && !existing_Time.date) || excluded_time.date === existing_Time.date)
         ){
             continue // skip a day for updating
         }

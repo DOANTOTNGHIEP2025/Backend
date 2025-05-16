@@ -191,16 +191,38 @@ class appointment_Controller {
 
         if (!doctor) {
             throw new Error("Doctor schedule not found");
-        }
+        }        const day_Of_Week = appointment_day.split(" ")[0];
+        
+        // Extract the specific date from the appointment_day (Format: "Monday 2024-05-16")
+        const appointmentParts = appointment_day.split(" ");
+        const specificDate = appointmentParts.length > 1 ? appointmentParts[1] : null;
 
-        const day_Of_Week = appointment_day.split(" ")[0];
-
-        const doctor_active_hour = doctor.active_hours.find(
-        (active_Hour) =>
-            active_Hour.day === day_Of_Week &&
-            active_Hour.start_time === appointment_time_start &&
-            active_Hour.end_time === appointment_time_end
+        // First, try to find a date-specific active hour that exactly matches this date
+        let doctor_active_hour = doctor.active_hours.find(
+            (active_Hour) =>
+                active_Hour.date === specificDate && // Match specific date first
+                active_Hour.day === day_Of_Week &&
+                active_Hour.start_time === appointment_time_start &&
+                active_Hour.end_time === appointment_time_end
         );
+        
+        // If no date-specific active hour is found, fall back to day-of-week schedule
+        if (!doctor_active_hour) {
+            doctor_active_hour = doctor.active_hours.find(
+                (active_Hour) =>
+                    !active_Hour.date && // Only consider non-date-specific hours now
+                    active_Hour.day === day_Of_Week &&
+                    active_Hour.start_time === appointment_time_start &&
+                    active_Hour.end_time === appointment_time_end
+            );
+        }
+        
+        // Log for debugging
+        if (doctor_active_hour && doctor_active_hour.date) {
+            console.log(`Found date-specific active hour for: ${specificDate}`);
+        } else if (doctor_active_hour) {
+            console.log(`Found day-of-week active hour for: ${day_Of_Week}`);
+        }
 
         if (!doctor_active_hour) {
             throw new Error("Doctor is not available at this time");
