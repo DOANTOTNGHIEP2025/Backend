@@ -91,6 +91,15 @@ Doctor_Schema.statics.add_Doctor = async function(email, password, username, pho
 }
 
 Doctor_Schema.statics.Is_Time_Overlap = async function(new_time, account_Id, excluded_time = {}) {
+    // Log for debugging
+    console.log("Checking overlap for:", {
+        new_time: {
+            day: new_time.day,
+            time: `${new_time.start_time}-${new_time.end_time}`,
+            date: new_time.date || "no specific date"
+        },
+        excluded_time: excluded_time
+    });
 
     const account_active_hours = await this.findById(account_Id, {active_hours: 1})
 
@@ -109,23 +118,39 @@ Doctor_Schema.statics.Is_Time_Overlap = async function(new_time, account_Id, exc
     ) 
 
     for(let existing_Time of existing_Times){
-
-        // Skip if different day or type or date
+        // Skip if different day or type
         if (existing_Time.day !== new_time.day || existing_Time.hour_type !== new_time.hour_type) {
             continue
         }
         
-        // If dates are provided, check if they are different
-        if (existing_Time.date && new_time.date && existing_Time.date !== new_time.date) {
-            continue // skip if different specific dates
+        // Clear separation for specific date scheduling vs regular day scheduling
+        
+        // Case 1: New time is for a specific date
+        if (new_time.date) {
+            // Only compare with existing times for the same specific date
+            if (!existing_Time.date || existing_Time.date !== new_time.date) {
+                continue // Skip if dates don't match or existing time is not date-specific
+            }
+            console.log("Comparing specific dates:", new_time.date, "with", existing_Time.date);
+        } 
+        // Case 2: New time is for a recurring day (not date specific)
+        else {
+            // Skip comparison with date-specific schedules
+            if (existing_Time.date) {
+                continue
+            }
+            console.log("Comparing recurring schedules for day:", new_time.day);
         }
 
+        // Skip the time we're updating (if applicable)
         if(excluded_time.day === existing_Time.day 
            && excluded_time.start_time === existing_Time.start_time 
            && excluded_time.end_time === existing_Time.end_time
            && excluded_time.hour_type === existing_Time.hour_type
-           && ((!excluded_time.date && !existing_Time.date) || excluded_time.date === existing_Time.date)
+           && ((!excluded_time.date && !existing_Time.date) || 
+               (excluded_time.date && existing_Time.date && excluded_time.date === existing_Time.date))
         ){
+            console.log("Skipping the time being updated");
             continue // skip a day for updating
         }
         
@@ -135,9 +160,22 @@ Doctor_Schema.statics.Is_Time_Overlap = async function(new_time, account_Id, exc
         let existing_Range = moment.range(
             moment().set({hours: existing_Start[0], minutes: existing_Start[1]}),
             moment().set({ hours: existing_End[0], minutes: existing_End[1] })
-        )
-
+        )        // Check for time range overlap
         if(existing_Range.overlaps(new_Range)){
+            // Log overlap detection for debugging
+            console.log("Overlap detected between:", {
+                existing: {
+                    day: existing_Time.day,
+                    time: `${existing_Time.start_time}-${existing_Time.end_time}`,
+                    date: existing_Time.date || "no specific date"
+                },
+                new: {
+                    day: new_time.day,
+                    time: `${new_time.start_time}-${new_time.end_time}`,
+                    date: new_time.date || "no specific date"
+                }
+            });
+            
             return true // time frames overlap
         }
         
