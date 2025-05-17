@@ -186,8 +186,7 @@ class doctor_Controller{
             res.status(400).json({error: error.message});
         }
     };
-    
-    add_Doctor_Active_Hour = async(req, res) => {
+      add_Doctor_Active_Hour = async(req, res) => {
         try{
             const {day, start_time, end_time, hour_type, appointment_limit, date} = req.body
 
@@ -198,6 +197,32 @@ class doctor_Controller{
             // get id
             const account_Id = req.params.id
 
+            // Validate date format if provided
+            let processedDate = null;
+            if (date) {
+                // Ensure date is in YYYY-MM-DD format
+                const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                if (!dateRegex.test(date)) {
+                    throw new Error('Invalid date format. Use YYYY-MM-DD');
+                }
+                
+                // Make sure the date's day of week matches the provided day
+                const dateObj = new Date(date);
+                if (isNaN(dateObj.getTime())) {
+                    throw new Error('Invalid date');
+                }
+                
+                const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const dayOfWeek = daysOfWeek[dateObj.getDay()];
+                
+                if (dayOfWeek !== day) {
+                    throw new Error(`Date ${date} is a ${dayOfWeek}, not a ${day}. Day must match the date`);
+                }
+                
+                processedDate = date;
+                console.log(`Validated date-specific active hour for ${day} (${date})`);
+            }
+
             // check overlap
             const new_Active_Hour = {
                 day, 
@@ -205,15 +230,15 @@ class doctor_Controller{
                 end_time, 
                 hour_type, 
                 appointment_limit,
-                date: date || null // Include date if provided
+                date: processedDate // Use validated date or null
             }
             
             // Log for debugging
             console.log("Adding new active hour:", new_Active_Hour);
             
             // Add special check for date-specific active hours
-            if (date) {
-                console.log("Adding date-specific active hour for:", date);
+            if (processedDate) {
+                console.log("Adding date-specific active hour for:", processedDate);
             } else {
                 console.log("Adding general weekday active hour for:", day);
             }
@@ -434,7 +459,7 @@ class doctor_Controller{
             res.status(400).json({ error: error.message });
         }
     };
-        delete_Doctor_Active_Hour = async (req, res) => {
+    delete_Doctor_Active_Hour = async (req, res) => {
         try {
             const { day, start_time, end_time, hour_type, date } = req.body;
     
@@ -447,15 +472,60 @@ class doctor_Controller{
     
             // Find the doctor
             const doctor = await Doctor.findById(account_Id);
+            
+            if (!doctor) {
+                throw new Error('Doctor not found');
+            }
     
-            // Find index of the active hour to be deleted
-            const index = doctor.active_hours.findIndex(time_frame =>
-                time_frame.day === day &&
-                time_frame.start_time === start_time &&
-                time_frame.end_time === end_time &&
-                time_frame.hour_type === hour_type &&
-                ((!date && !time_frame.date) || (date === time_frame.date))
-            );
+            // Log what we're looking for with very clear formatting
+            console.log("\n==== ATTEMPTING TO DELETE ACTIVE HOUR ====");
+            console.log("Looking for schedule to delete:", {
+                day,
+                start_time,
+                end_time,
+                hour_type,
+                date: date || "NO DATE (recurring schedule)"
+            });
+            
+            // Log all available hours for debugging with better formatting
+            console.log("\nAvailable schedules:");
+            doctor.active_hours.forEach((h, i) => {
+                console.log(`${i+1}. ${h.day} ${h.start_time}-${h.end_time} | ${h.date ? `Date: ${h.date}` : 'Recurring weekly'}`);
+            });
+            
+            // Create a more detailed matching function with logging
+            const index = doctor.active_hours.findIndex(time_frame => {
+                console.log("\nComparing with:", {
+                    day: time_frame.day,
+                    time: `${time_frame.start_time}-${time_frame.end_time}`,
+                    date: time_frame.date || "NO DATE (recurring)"
+                });
+                
+                // Check each criterion separately for better debugging
+                const dayMatch = time_frame.day === day;
+                const timeMatch = time_frame.start_time === start_time && time_frame.end_time === end_time;
+                const typeMatch = time_frame.hour_type === hour_type;
+                
+                // Date matching logic with detailed logging
+                let dateMatch = false;
+                if (date && time_frame.date) {
+                    // Both have dates - they should match exactly
+                    dateMatch = date === time_frame.date;
+                    console.log(`Date comparison: ${date} vs ${time_frame.date} -> ${dateMatch ? "MATCH" : "NO MATCH"}`);
+                } else if (!date && !time_frame.date) {
+                    // Neither has date - this is a match for recurring schedules
+                    dateMatch = true;
+                    console.log("Both are recurring schedules -> MATCH");
+                } else {
+                    // One has date, one doesn't - not a match
+                    console.log(`Date mismatch: One has date, one doesn't -> NO MATCH`);
+                    dateMatch = false;
+                }
+                
+                const isMatch = dayMatch && timeMatch && typeMatch && dateMatch;
+                console.log(`Match result: ${isMatch ? "✅ FOUND MATCH" : "❌ NO MATCH"}`);
+                return isMatch;
+            });
     
             if (index === -1) {
                 throw new Error('Active hour not found');

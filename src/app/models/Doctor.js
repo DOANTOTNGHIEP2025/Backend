@@ -98,7 +98,8 @@ Doctor_Schema.statics.Is_Time_Overlap = async function(new_time, account_Id, exc
             time: `${new_time.start_time}-${new_time.end_time}`,
             date: new_time.date || "no specific date"
         },
-        excluded_time: excluded_time
+        excluded_time: excluded_time,
+        account_Id: account_Id
     });
 
     const account_active_hours = await this.findById(account_Id, {active_hours: 1})
@@ -106,6 +107,7 @@ Doctor_Schema.statics.Is_Time_Overlap = async function(new_time, account_Id, exc
     const existing_Times = account_active_hours?.active_hours || []
 
     if(!existing_Times || existing_Times.length === 0){ // no existing time frame
+        console.log("No existing time frames found");
         return false // no overlapping time frame
     }
 
@@ -117,29 +119,85 @@ Doctor_Schema.statics.Is_Time_Overlap = async function(new_time, account_Id, exc
         moment().set({ hours: new_End[0], minutes: new_End[1] })
     ) 
 
+    // Log all existing times for debugging
+    console.log("All existing timeframes:", existing_Times.map(t => ({
+        day: t.day, 
+        time: `${t.start_time}-${t.end_time}`, 
+        date: t.date || "recurring weekly"
+    })));
+    
     for(let existing_Time of existing_Times){
-        // Skip if different day or type
+        // Skip the time frame if it's the one we're updating
+        if (excluded_time && 
+            excluded_time.day === existing_Time.day && 
+            excluded_time.start_time === existing_Time.start_time && 
+            excluded_time.end_time === existing_Time.end_time &&
+            excluded_time.date === existing_Time.date) {
+            console.log("Skipping the excluded time frame (the one being updated)");
+            continue;
+        }
+          // Skip if different day or type
         if (existing_Time.day !== new_time.day || existing_Time.hour_type !== new_time.hour_type) {
-            continue
+            console.log(`Skipping: different day or hour type. 
+                         Day match: ${existing_Time.day === new_time.day}, 
+                         Hour type match: ${existing_Time.hour_type === new_time.hour_type}`);
+            continue;
         }
         
-        // Clear separation for specific date scheduling vs regular day scheduling
-        
-        // Case 1: New time is for a specific date
+        // Improved handling of date-specific vs recurring schedules
+          // Case 1: New time is for a specific date
         if (new_time.date) {
             // Only compare with existing times for the same specific date
-            if (!existing_Time.date || existing_Time.date !== new_time.date) {
-                continue // Skip if dates don't match or existing time is not date-specific
+            // If the existing time has a date, it must match. If existing time is recurring, check the day.
+            if (existing_Time.date) {
+                // Both have dates - compare them directly
+                if (existing_Time.date !== new_time.date) {
+                    console.log(`Skipping comparison - different specific dates:
+                                New time date: ${new_time.date} (${new_time.day})
+                                Existing time date: ${existing_Time.date} (${existing_Time.day})`);
+                    continue; // Skip if dates don't match
+                }
+            } else {
+                // Existing time is recurring - make sure the day matches
+                if (existing_Time.day !== new_time.day) {
+                    console.log(`Skipping comparison - recurring day doesn't match:
+                                New time date: ${new_time.date} (${new_time.day})
+                                Existing time: recurring every ${existing_Time.day}`);
+                    continue;
+                }
+                // If days match, this is a potential conflict between specific and recurring
+                console.log(`⚠️ Potential conflict: new date-specific schedule on ${new_time.date} (${new_time.day}) 
+                            conflicts with recurring schedule for ${existing_Time.day}`);
             }
-            console.log("Comparing specific dates:", new_time.date, "with", existing_Time.date);
-        } 
+            console.log("✓ Valid comparison - checking overlap for specific date:", new_time.date);
+        }
         // Case 2: New time is for a recurring day (not date specific)
         else {
-            // Skip comparison with date-specific schedules
+            // If existing time has a specific date, only check if the days match
             if (existing_Time.date) {
-                continue
+                // Get day of week for the specific date
+                const dateObj = new Date(existing_Time.date);
+                const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const dayOfWeek = daysOfWeek[dateObj.getDay()];
+                
+                // If the new recurring schedule day matches the day of the specific date
+                if (new_time.day === dayOfWeek) {
+                    console.log(`⚠️ Potential conflict: new recurring schedule for ${new_time.day} 
+                                affects existing date-specific schedule on ${existing_Time.date} (${dayOfWeek})`);
+                } else {
+                    console.log(`Skipping comparison - new recurring day doesn't match date-specific day:
+                                New time: recurring every ${new_time.day}
+                                Existing time: specific date ${existing_Time.date} (${dayOfWeek})`);
+                    continue;
+                }
+            } else if (existing_Time.day !== new_time.day) {
+                // Both are recurring, but different days
+                console.log(`Skipping comparison - different recurring days:
+                            New time: recurring every ${new_time.day}
+                            Existing time: recurring every ${existing_Time.day}`);
+                continue;
             }
-            console.log("Comparing recurring schedules for day:", new_time.day);
+            console.log("✓ Valid comparison - checking overlap for recurring schedules on day:", new_time.day);
         }
 
         // Skip the time we're updating (if applicable)
@@ -151,7 +209,7 @@ Doctor_Schema.statics.Is_Time_Overlap = async function(new_time, account_Id, exc
                (excluded_time.date && existing_Time.date && excluded_time.date === existing_Time.date))
         ){
             console.log("Skipping the time being updated");
-            continue // skip a day for updating
+            continue; // skip a day for updating
         }
         
         let existing_Start = existing_Time.start_time.split(':') // get hours and minutes

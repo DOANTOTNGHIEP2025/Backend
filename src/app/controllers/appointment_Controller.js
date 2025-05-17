@@ -170,52 +170,81 @@ class appointment_Controller {
             console.error("Error while sending email:", error.message);
             throw new Error("Can not send email");
         }
-    };
-
-    check_Appointment_time = async (
+    };    check_Appointment_time = async (
         doctor_id,
         appointment_day,
         appointment_time_start,
         appointment_time_end
     ) => {
+        console.log("Checking appointment time availability for:", {
+            doctor_id,
+            appointment_day,
+            time: `${appointment_time_start} - ${appointment_time_end}`
+        });
+        
+        // First check existing appointments
         const existing_appointments = await Appointment.find({
-        doctor_id,
-        appointment_day,
-        appointment_time_start,
-        appointment_time_end,
+            doctor_id,
+            appointment_day,
+            appointment_time_start,
+            appointment_time_end,
         });
 
         const counter = existing_appointments.length;
+        console.log(`Found ${counter} existing appointment(s) for this slot`);
 
         const doctor = await Doctor.findById(doctor_id).select("active_hours");
 
         if (!doctor) {
             throw new Error("Doctor schedule not found");
         }
-        
+          // Parse appointment_day to extract day of week and specific date if present
         const day_Of_Week = appointment_day.split(" ")[0];
-        
-        // Extract the specific date from the appointment_day (Format: "Monday 2024-05-16")
         const appointmentParts = appointment_day.split(" ");
-        const specificDate = appointmentParts.length > 1 ? appointmentParts[1] : null;
+        const isSpecificDate = appointmentParts.length > 1;
+        const specificDate = isSpecificDate ? appointmentParts[1] : null;
+        
+        console.log("Checking availability:", {
+            dayOfWeek: day_Of_Week,
+            isSpecificDate,
+            specificDate,
+            slot: `${appointment_time_start}-${appointment_time_end}`,
+            fullAppointmentDay: appointment_day
+        });
 
         // First, try to find a date-specific active hour that exactly matches this date
-        let doctor_active_hour = doctor.active_hours.find(
-            (active_Hour) =>
-                active_Hour.date === specificDate && // Match specific date first
-                active_Hour.day === day_Of_Week &&
-                active_Hour.start_time === appointment_time_start &&
-                active_Hour.end_time === appointment_time_end
-        );
+        let doctor_active_hour = null;
+        
+        if (isSpecificDate) {
+            // For specific date appointments, prioritize checking date-specific schedules
+            doctor_active_hour = doctor.active_hours.find(
+                (active_Hour) =>
+                    active_Hour.date === specificDate && // Match specific date first
+                    active_Hour.day === day_Of_Week &&
+                    active_Hour.start_time === appointment_time_start &&
+                    active_Hour.end_time === appointment_time_end
+            );
+            
+            console.log(
+                doctor_active_hour 
+                ? `Found matching date-specific active hour for ${specificDate}` 
+                : `No date-specific active hour found for ${specificDate}, checking regular schedules`
+            );
+        }
         
         // If no date-specific active hour is found, fall back to day-of-week schedule
         if (!doctor_active_hour) {
             doctor_active_hour = doctor.active_hours.find(
                 (active_Hour) =>
-                    !active_Hour.date && // Only consider non-date-specific hours now
+                    !active_Hour.date && // Only consider non-date-specific hours
                     active_Hour.day === day_Of_Week &&
                     active_Hour.start_time === appointment_time_start &&
                     active_Hour.end_time === appointment_time_end
+            );
+              console.log(
+                doctor_active_hour 
+                ? `Found matching recurring weekly active hour for ${day_Of_Week}` 
+                : `No active hours found for ${day_Of_Week} at ${appointment_time_start}-${appointment_time_end}`
             );
         }
         
@@ -233,9 +262,7 @@ class appointment_Controller {
         if (counter >= doctor_active_hour.appointment_limit) {
             throw new Error("This schedule is fully booked");
         }
-    };
-
-    add_Appointment = async (req, res) => {
+    };    add_Appointment = async (req, res) => {
         try {
             const {
                 user_id,
@@ -256,7 +283,44 @@ class appointment_Controller {
             ) {
                 throw new Error("Missing information");
             }
+            
+            // Log for debugging appointment creation
+            console.log("Creating appointment with day:", appointment_day);
+            
+            // Check if this is a date-specific appointment or a recurring one
+            // Standard format: "Monday 2024-05-20" for specific dates 
+            // or just "Monday" for recurring weekly schedules
+            const appointmentParts = appointment_day.split(" ");
+            const dayOfWeek = appointmentParts[0]; // Always the first part
+            const isSpecificDate = appointmentParts.length > 1;
+            const specificDate = isSpecificDate ? appointmentParts[1] : null; // Get the date if it exists
+            
+            if (isSpecificDate) {
+                console.log(`Creating appointment for specific date: ${dayOfWeek} ${specificDate}`);
+                
+                // Confirm the date is valid
+                try {
+                    const dateObj = new Date(specificDate);
+                    if (isNaN(dateObj.getTime())) {
+                        throw new Error("Invalid date format");
+                    }
+                    
+                    // Verify the day of week matches the date
+                    const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                    const actualDayOfWeek = daysOfWeek[dateObj.getDay()];
+                    
+                    if (dayOfWeek !== actualDayOfWeek) {
+                        console.warn(`Warning: Supplied day of week (${dayOfWeek}) doesn't match actual day of week for date ${specificDate} (${actualDayOfWeek})`);
+                    }
+                } catch (error) {
+                    console.error("Date validation error:", error);
+                    throw new Error("Invalid date format in appointment_day");
+                }
+            } else {
+                console.log(`Creating recurring appointment for day of week: ${appointment_day}`);
+            }
 
+            // Check if the time slot is available
             await this.check_Appointment_time(
                 doctor_id,
                 appointment_day,
