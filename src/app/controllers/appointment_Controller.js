@@ -191,7 +191,9 @@ class appointment_Controller {
 
         if (!doctor) {
             throw new Error("Doctor schedule not found");
-        }        const day_Of_Week = appointment_day.split(" ")[0];
+        }
+        
+        const day_Of_Week = appointment_day.split(" ")[0];
         
         // Extract the specific date from the appointment_day (Format: "Monday 2024-05-16")
         const appointmentParts = appointment_day.split(" ");
