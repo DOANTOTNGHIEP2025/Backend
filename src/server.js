@@ -22,6 +22,9 @@ app.set("trust proxy", true);
 db.connect();
 
 routes(app);
+app.get("/", (req, res) => {
+    res.send("Backend is working! ✅");
+  });
 
 app.listen(process.env.PORT, () => {
     console.log("Backend server running on port", process.env.PORT);
