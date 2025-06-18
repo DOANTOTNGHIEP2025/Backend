@@ -51,7 +51,7 @@ class appointment_Controller {
             const email_Content = await ejs.renderFile(
                 path.join(__dirname, "../views", "appointment-notice.ejs"), {
                 doctor,
-                appointment_Date,
+                appointment_day,
                 appointment_time_start: appointment_time_start,
                 appointment_time_end: appointment_time_end,
             });
