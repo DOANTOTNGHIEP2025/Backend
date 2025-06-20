@@ -42,7 +42,7 @@ class appointment_Controller {
             );
 
             // UTC off-set
-            const timeZoneOffset = 7 * 60 * 60 * 1000; // UTC+7 offset in milliseconds
+            const timeZoneOffset = 7 * 60 * 60 * 1000; // UTC+7 
             const local_Time = new Date(utc_Time_Start.getTime() + timeZoneOffset);
 
             const appointment_Date = `${local_Time.getDate()} - ${local_Time.getMonth() + 1} - ${local_Time.getFullYear()}`;
@@ -124,7 +124,7 @@ class appointment_Controller {
             );
 
             // UTC off-set
-            const timeZoneOffset = 7 * 60 * 60 * 1000; // UTC+7 offset in milliseconds
+            const timeZoneOffset = 7 * 60 * 60 * 1000; // UTC+7 
             const local_Time = new Date(utc_Time_Start.getTime() + timeZoneOffset);
 
             const appointment_Date = `${local_Time.getDate()} - ${local_Time.getMonth() + 1} - ${local_Time.getFullYear()}`;
@@ -212,7 +212,7 @@ class appointment_Controller {
             fullAppointmentDay: appointment_day
         });
 
-        // First, try to find a date-specific active hour that exactly matches this date
+        
         let doctor_active_hour = null;
         
         if (isSpecificDate) {
@@ -236,7 +236,7 @@ class appointment_Controller {
         if (!doctor_active_hour) {
             doctor_active_hour = doctor.active_hours.find(
                 (active_Hour) =>
-                    !active_Hour.date && // Only consider non-date-specific hours
+                    !active_Hour.date && 
                     active_Hour.day === day_Of_Week &&
                     active_Hour.start_time === appointment_time_start &&
                     active_Hour.end_time === appointment_time_end
@@ -248,7 +248,7 @@ class appointment_Controller {
             );
         }
         
-        // Log for debugging
+      
         if (doctor_active_hour && doctor_active_hour.date) {
             console.log(`Found date-specific active hour for: ${specificDate}`);
         } else if (doctor_active_hour) {
@@ -287,13 +287,10 @@ class appointment_Controller {
             // Log for debugging appointment creation
             console.log("Creating appointment with day:", appointment_day);
             
-            // Check if this is a date-specific appointment or a recurring one
-            // Standard format: "Monday 2024-05-20" for specific dates 
-            // or just "Monday" for recurring weekly schedules
             const appointmentParts = appointment_day.split(" ");
-            const dayOfWeek = appointmentParts[0]; // Always the first part
+            const dayOfWeek = appointmentParts[0]; 
             const isSpecificDate = appointmentParts.length > 1;
-            const specificDate = isSpecificDate ? appointmentParts[1] : null; // Get the date if it exists
+            const specificDate = isSpecificDate ? appointmentParts[1] : null; 
             
             if (isSpecificDate) {
                 console.log(`Creating appointment for specific date: ${dayOfWeek} ${specificDate}`);
@@ -492,6 +489,9 @@ class appointment_Controller {
         try {
             const { appointment_id, insurance_id, name, number, location, exp_date } =
                 req.body;
+
+            console.log(appointment_id, insurance_id, name, number, location, exp_date)
+            console.log("nhim")
 
             const appointment = await Appointment.findById(appointment_id);
 

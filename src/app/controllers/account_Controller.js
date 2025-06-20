@@ -16,7 +16,6 @@ const Admin_Access = require("../models/Admin_Access");
 
 require("dotenv").config();
 
-// const default_profile_img = process.env.DEFAULT_PROFILE_IMG
 
 class account_Controller {
     create_Token = (_id, expiresIn = "1d") => {
@@ -24,10 +23,10 @@ class account_Controller {
     };
 
     acc_Login = async (req, res) => {
-        // get info from body
+       
         const { email, password } = req.body;
         console.log(req.headers["content-type"]);
-        // get account
+      
         try {
             let acc;
             acc = await User.login(email, password);
@@ -63,7 +62,7 @@ class account_Controller {
             if (req.fileValidationError) {
                 return res.status(400).json({ error: req.fileValidationError });
             }
-            // get info from body
+           
             const { email, password, username, phone, is_doc } = req.body;
 
             let acc;
@@ -72,7 +71,7 @@ class account_Controller {
             if (is_doc == "1") {
                 let proof = null;
                     if (req.file) {
-                    // Upload file to Cloudinary
+                    
                     const uploadResult = await cloudinary.uploader.upload(req.file.path, {
                         folder: "PBL6/proofs",
                         overwrite: true,
@@ -90,7 +89,7 @@ class account_Controller {
 
                 acc = await Doctor.add_Doctor(email, password, username, phone, proof);
             } else {
-                // console.log('not doc')
+                
                 acc = await User.add_User(email, password, username, phone);
             }
             // create token and respone
@@ -176,10 +175,10 @@ class account_Controller {
 
     update_Acc_Info = async (req, res) => {
         try {
-            // get info from body
+         
             const { username, phone, underlying_condition, date_of_birth, address } = req.body;
 
-            // get id
+         
             const account_Id = req.params.id;
 
             // find account
@@ -205,7 +204,7 @@ class account_Controller {
                 });
 
                 profile_image = uploadResult.secure_url;
-                fs.unlinkSync(req.file.path); // Delete temporary file
+                fs.unlinkSync(req.file.path);
             }
 
             // update
@@ -239,13 +238,12 @@ class account_Controller {
         try {
             const session = await mongoose.startSession()
 
-            // Start transaction
+          
             session.startTransaction()
 
-            // get id list
             const { account_Ids } = req.body;
 
-            // if no ids
+        
             if (
                 !account_Ids ||
                 !Array.isArray(account_Ids) ||
@@ -261,7 +259,7 @@ class account_Controller {
                 {session}
             );
 
-            // cancel all appointment with the same user_id
+           
             const cancel_appointment = await Appointment.deleteMany(
                 {user_id: {$in: account_Ids}},
                 {session}
@@ -277,7 +275,7 @@ class account_Controller {
                 canceledAppointments: cancel_appointment.deletedCount
             })
         } catch (error) {
-            // Rollback transaction on error
+            
             await session.abortTransaction()
             session.endSession()
 
@@ -323,10 +321,9 @@ class account_Controller {
             // Start transaction
             session.startTransaction()
 
-            // get id list
+           
             const { account_Ids } = req.body;
 
-            // if no ids
             if (
                 !account_Ids ||
                 !Array.isArray(account_Ids) ||
@@ -338,7 +335,7 @@ class account_Controller {
             // Find doctor_ids in Appointment collection
             const doctors_in_appointments = await Appointment.distinct('doctor_id')
 
-            // Filter account_Ids to exclude those that exist as doctor_id
+            
             const filtered_Ids = account_Ids.filter(
                 id => !doctors_in_appointments.includes(id)
             )
@@ -373,11 +370,11 @@ class account_Controller {
                         });
                     });
                 });
-                // Wait for all deletions to complete
+                // 
                 await Promise.all(cloudinary_Delete_Promises); 
             }
 
-            // delete
+           
             const result = await User.deleteMany(
                 {_id: {$in: filtered_Ids}},
                 {session}
@@ -399,7 +396,7 @@ class account_Controller {
                 canceledAppointments: cancel_appointment.deletedCount
             })
         } catch (error) {
-        // Rollback transaction on error
+        
             await session.abortTransaction()
             session.endSession()
 
@@ -436,8 +433,8 @@ class account_Controller {
             const html_Content = await ejs.renderFile(
                 path.join(__dirname, "../views", "password-reset.ejs"),
                 {
-                username: account.username, // Pass the username
-                reset_URL, // Pass the reset URL
+                username: account.username, 
+                reset_URL, 
                 }
             );
 
@@ -488,7 +485,7 @@ class account_Controller {
             // Render the return page with the new password
             const html_Content = await ejs.renderFile(
                 path.join(__dirname, "../views", "password-reset-success.ejs"), {
-                    new_Password, // Pass the dynamic password to the template
+                    new_Password, 
             });
 
             return res.status(200).send(html_Content);
@@ -501,17 +498,17 @@ class account_Controller {
             // Render the error page with the error message
             const html_Error_Content = await ejs.renderFile(
                 path.join(__dirname, "../views", "landing-error.ejs"),{
-                error_Message, // Pass the error message to the template
+                error_Message, 
             });
 
-            // Send the error page as the response
+           
             return res.status(400).send(html_Error_Content);
         }
     };
 
     change_password = async (req, res) => {
         try {
-            // const {email} = req.user
+            
             const { email, new_password } = req.body;
             const user = await User.change_pass(email, new_password);
 
@@ -614,7 +611,7 @@ class account_Controller {
         const mail_Options = {
             from: process.env.EMAIL,
             to: email,
-            subject: "Xác nhận tài khoản",
+            subject: "Xác minh tài khoản",
             html: html_Content,
         };
 
@@ -644,7 +641,7 @@ class account_Controller {
             }
 
             return res.status(200).send(
-                "<h1>Đã xác nhận tài khoản thành công</h1>"
+                "<h1>Đã xác minh tài khoản thành công</h1>"
             );
         } catch (error) {
             const error_Message =
@@ -655,10 +652,9 @@ class account_Controller {
             // Render the error page with the error message
             const html_Error_Content = await ejs.renderFile(
                 path.join(__dirname, "../views", "landing-error.ejs"),{
-                error_Message, // Pass the error message to the template
+                error_Message, 
             });
 
-            // Send the error page as the response
             return res.status(400).send(html_Error_Content);
         }
     };

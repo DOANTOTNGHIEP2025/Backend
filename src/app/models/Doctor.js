@@ -15,7 +15,7 @@ const Schema = mongoose.Schema
 
 require("dotenv").config()
 
-// const default_profile_img = process.env.DEFAULT_PROFILE_IMG
+
 
 const Doctor_Schema = new Schema({
     speciality_id: {
@@ -64,10 +64,6 @@ Doctor_Schema.statics.add_Doctor = async function(email, password, username, pho
     if(!validator.isStrongPassword(password)){
         throw new Error('Mật khẩu không đủ mạnh!')
     }
-
-    // if(!validator.isMobilePhone(phone, 'vi-VN')){
-    //     throw new Error('Invalid phone number!')
-    // }
 
     const doc_exists = await this.findOne({email})
     const user_exists = await User.findOne({email})
